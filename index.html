@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>품질 클레임 관제 대시보드</title>
+  <!-- 엑셀(.xlsx) 내보내기용 SheetJS -->
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+  <style>
+    :root {
+      --bg: #F7F5F0;
+      --surface: #FFFFFF;
+      --coffee-dark: #3B2820;
+      --coffee-mid: #6F4E37;
+      --green-deep: #1E4D3B;
+      --green-soft: #E8F2EE;
+      --border: #E5DFD5;
+      --text-main: #2C221E;
+      --text-sub: #756861;
+      --alert-bg: #FDF2F2;
+      --alert-border: #E57373;
+      --alert-text: #B71C1C;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Pretendard", sans-serif;
+      background-color: var(--bg);
+      color: var(--text-main);
+      line-height: 1.5;
+      padding-bottom: 40px;
+    }
+
+    header {
+      background-color: var(--green-deep);
+      color: #FFFFFF;
+      padding: 18px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+    }
+    header h1 { font-size: 1.15rem; font-weight: 700; letter-spacing: -0.3px; }
+    .refresh-btn {
+      background: rgba(255, 255, 255, 0.15);
+      color: #FFF;
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      cursor: pointer;
+    }
+    .refresh-btn:hover { background: rgba(255, 255, 255, 0.25); }
+
+    .container { max-width: 960px; margin: 20px auto; padding: 0 16px; }
+
+    /* 경보 배너 */
+    .alert-banner {
+      display: none;
+      background: var(--alert-bg);
+      border: 1px solid var(--alert-border);
+      border-left: 5px solid var(--alert-text);
+      border-radius: 8px;
+      padding: 14px 16px;
+      margin-bottom: 18px;
+    }
+    .alert-banner.active { display: block; }
+    .alert-title {
+      color: var(--alert-text);
+      font-weight: 700;
+      font-size: 0.95rem;
+      margin-bottom: 6px;
+    }
+    .alert-list { list-style: none; font-size: 0.9rem; color: #7F1D1D; }
+    .alert-list li { margin-top: 4px; }
+
+    /* 요약 카드 */
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      margin-bottom: 18px;
+    }
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 16px;
+    }
+    .stat-label { font-size: 0.8rem; color: var(--text-sub); margin-bottom: 4px; }
+    .stat-value { font-size: 1.5rem; font-weight: 700; color: var(--coffee-dark); }
+    .stat-value.danger { color: var(--alert-text); }
+
+    /* 설정 및 액션 바 */
+    .controls-bar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+    }
+    .settings-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.88rem;
+      flex-wrap: wrap;
+    }
+    .settings-group input[type="number"] {
+      width: 56px;
+      padding: 6px 8px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      text-align: center;
+      font-size: 0.9rem;
+    }
+    .btn {
+      padding: 8px 14px;
+      border-radius: 6px;
+      border: none;
+      font-size: 0.88rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .btn-coffee { background: var(--coffee-dark); color: #FFF; }
+    .btn-coffee:hover { background: var(--coffee-mid); }
+    .btn-green { background: var(--green-deep); color: #FFF; }
+    .btn-green:hover { opacity: 0.92; }
+
+    /* 검색 입력창 */
+    .search-box {
+      width: 100%;
+      padding: 10px 14px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-size: 0.92rem;
+      margin-bottom: 14px;
+      background: #FFF;
+    }
+
+    /* 데이터 테이블 */
+    .table-wrap {
+      overflow-x: auto;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+    }
+    table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+    th {
+      background: var(--green-soft);
+      color: var(--green-deep);
+      text-align: left;
+      padding: 12px 14px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+    td {
+      padding: 11px 14px;
+      border-top: 1px solid var(--border);
+      vertical-align: middle;
+    }
+    .badge {
+      display: inline-block;
+      padding: 3px 8px;
+      border-radius: 12px;
+      font-size: 0.78rem;
+      font-weight: 600;
+      background: #EFEBE6;
+      color: var(--coffee-dark);
+    }
+    .empty-msg { text-align: center; padding: 32px; color: var(--text-sub); }
+
+    @media (max-width: 600px) {
+      .summary-grid { grid-template-columns: 1fr; }
+      .controls-bar { flex-direction: column; align-items: stretch; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>품질 클레임 관제 모니터</h1>
+    <button class="refresh-btn" onclick="loadDashboard()">새로고침</button>
+  </header>
+
+  <main class="container">
+    <!-- 1. 기준 초과 경보 배너 -->
+    <section id="alertBanner" class="alert-banner">
+      <div class="alert-title" id="alertTitle">기준 건수 초과 경보 발생</div>
+      <ul id="alertList" class="alert-list"></ul>
+    </section>
+
+    <!-- 2. 핵심 지표 요약 -->
+    <section class="summary-grid">
+      <div class="card">
+        <div class="stat-label">전체 수집 건수</div>
+        <div class="stat-value" id="totalCount">-</div>
+      </div>
+      <div class="card">
+        <div class="stat-label">현재 경보 항목</div>
+        <div class="stat-value danger" id="alertCount">-</div>
+      </div>
+      <div class="card">
+        <div class="stat-label">적용 중인 경보 기준</div>
+        <div class="stat-value" id="currentRule" style="font-size: 1.15rem; padding-top: 4px;">-</div>
+      </div>
+    </section>
+
+    <!-- 3. 기준 설정 및 엑셀 다운로드 -->
+    <section class="card controls-bar">
+      <div class="settings-group">
+        <span>최근</span>
+        <input type="number" id="inputDays" min="1" max="30" value="2" />
+        <span>일 내</span>
+        <input type="number" id="inputThreshold" min="1" max="50" value="3" />
+        <span>건 이상 경보</span>
+        <button class="btn btn-coffee" onclick="saveSettings()">기준 저장</button>
+      </div>
+      <div>
+        <button class="btn btn-green" onclick="downloadExcel()">엑셀(.xlsx) 다운로드</button>
+      </div>
+    </section>
+
+    <!-- 4. 검색 및 클레임 리스트 -->
+    <input
+      type="text"
+      id="searchInput"
+      class="search-box"
+      placeholder="매장명, 제품명, 클레임 유형으로 검색..."
+      oninput="renderTable()"
+    />
+
+    <section class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>수신 일시</th>
+            <th>매장명</th>
+            <th>제품명</th>
+            <th>클레임 유형</th>
+          </tr>
+        </thead>
+        <tbody id="tableBody">
+          <tr><td colspan="4" class="empty-msg">데이터를 불러오는 중입니다...</td></tr>
+        </tbody>
+      </table>
+    </section>
+  </main>
+
+  <script>
+    let allClaims = [];
+
+    async function loadDashboard() {
+      const tbody = document.getElementById('tableBody');
+      tbody.innerHTML = '<tr><td colspan="4" class="empty-msg">데이터를 불러오는 중입니다...</td></tr>';
+
+      try {
+        const res = await fetch('/api/dashboard');
+        const json = await res.json();
+
+        if (json.status !== 'success') {
+          throw new Error(json.message || '데이터 로드 실패');
+        }
+
+        allClaims = json.data || [];
+        const alerts = json.alerts || [];
+        const settings = json.settings || { days: 2, threshold: 3 };
+
+        // 요약 및 설정값 반영
+        document.getElementById('totalCount').textContent = allClaims.length + '건';
+        document.getElementById('alertCount').textContent = alerts.length + '건';
+        document.getElementById('currentRule').textContent = `${settings.days}일 내 ${settings.threshold}건`;
+        document.getElementById('inputDays').value = settings.days;
+        document.getElementById('inputThreshold').value = settings.threshold;
+
+        // 경보 배너 렌더링
+        const banner = document.getElementById('alertBanner');
+        const alertList = document.getElementById('alertList');
+        if (alerts.length > 0) {
+          document.getElementById('alertTitle').textContent = `🚨 경보 발생 (${settings.days}일 내 ${settings.threshold}건 이상)`;
+          alertList.innerHTML = alerts
+            .map(a => `<li>• <strong>${escapeHtml(a.product)}</strong> [${escapeHtml(a.claimType)}] — <strong>${a.count}건</strong></li>`)
+            .join('');
+          banner.classList.add('active');
+        } else {
+          banner.classList.remove('active');
+        }
+
+        renderTable();
+      } catch (err) {
+        tbody.innerHTML = `<tr><td colspan="4" class="empty-msg">오류: ${escapeHtml(err.message)}</td></tr>`;
+      }
+    }
+
+    function renderTable() {
+      const keyword = document.getElementById('searchInput').value.trim().toLowerCase();
+      const filtered = allClaims.filter(c =>
+        !keyword ||
+        (c.store && c.store.toLowerCase().includes(keyword)) ||
+        (c.product && c.product.toLowerCase().includes(keyword)) ||
+        (c.claimType && c.claimType.toLowerCase().includes(keyword))
+      );
+
+      const tbody = document.getElementById('tableBody');
+      if (filtered.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="4" class="empty-msg">표시할 클레임 내역이 없습니다.</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = filtered.map(c => `
+        <tr>
+          <td style="white-space:nowrap; color:#756861;">${escapeHtml(c.date)}</td>
+          <td>${escapeHtml(c.store)}</td>
+          <td><strong>${escapeHtml(c.product)}</strong></td>
+          <td><span class="badge">${escapeHtml(c.claimType)}</span></td>
+        </tr>
+      `).join('');
+    }
+
+    async function saveSettings() {
+      const days = document.getElementById('inputDays').value;
+      const threshold = document.getElementById('inputThreshold').value;
+
+      try {
+        const res = await fetch('/api/dashboard', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ days, threshold })
+        });
+        const json = await res.json();
+        if (json.status === 'saved') {
+          alert(`경보 기준이 [${days}일 내 ${threshold}건]으로 저장되었습니다.`);
+          loadDashboard();
+        } else {
+          alert('저장에 실패했습니다.');
+        }
+      } catch (err) {
+        alert('저장 중 오류 발생: ' + err.message);
+      }
+    }
+
+    function downloadExcel() {
+      if (allClaims.length === 0) {
+        alert('다운로드할 데이터가 없습니다.');
+        return;
+      }
+      const rows = allClaims.map(c => ({
+        '수신 일시': c.date,
+        '매장명': c.store,
+        '제품명': c.product,
+        '클레임 유형': c.claimType,
+        '원문': c.raw
+      }));
+      const worksheet = XLSX.utils.json_to_sheet(rows);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, '클레임현황');
+
+      const today = new Date().toISOString().slice(0, 10);
+      XLSX.writeFile(workbook, `클레임_모니터링_${today}.xlsx`);
+    }
+
+    function escapeHtml(str) {
+      return String(str || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    // 페이지 로드 시 자동 조회
+    loadDashboard();
+  </script>
+</body>
+</html>
