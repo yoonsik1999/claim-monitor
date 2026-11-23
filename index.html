@@ -6,6 +6,27 @@
   <title>품질 클레임 관제 대시보드</title>
   <!-- 엑셀(.xlsx) 내보내기용 SheetJS -->
   <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+ /* 수신일시 2줄 레이아웃 및 매장명 여백 확보 */
+    .date-cell {
+      white-space: nowrap;
+      line-height: 1.3;
+      width: 90px;
+    }
+    .date-main {
+      display: block;
+      font-size: 0.84rem;
+      color: var(--text-main);
+      font-weight: 500;
+    }
+    .date-sub {
+      display: block;
+      font-size: 0.76rem;
+      color: var(--text-sub);
+    }
+    .store-cell {
+      min-width: 110px;
+      word-break: keep-all; /* 매장명이 글자 단위로 어색하게 끊기는 현상 방지 */
+    }
   <style>
     :root {
       --bg: #F7F5F0;
@@ -310,14 +331,25 @@
         return;
       }
 
-      tbody.innerHTML = filtered.map(c => `
-        <tr>
-          <td style="white-space:nowrap; color:#756861;">${escapeHtml(c.date)}</td>
-          <td>${escapeHtml(c.store)}</td>
-          <td><strong>${escapeHtml(c.product)}</strong></td>
-          <td><span class="badge">${escapeHtml(c.claimType)}</span></td>
-        </tr>
-      `).join('');
+      tbody.innerHTML = filtered.map(c => {
+        // ① 날짜와 시간 쪼개기: '2026-11-23 11:33:53' -> ['2026-11-23', '11:33:53']
+        const parts = String(c.date || '').split(' ');
+        const datePart = parts[0] || '';               // 첫 번째 덩어리: '2026-11-23'
+        const timePart = parts[1] ? parts[1].slice(0, 5) : ''; // 두 번째 덩어리 앞 5글자: '11:33'
+
+        // ② 윗줄(date-main)과 아랫줄(date-sub)로 나누어 화면에 그리기
+        return `
+          <tr>
+            <td class="date-cell">
+              <span class="date-main">${escapeHtml(datePart)}</span>
+              <span class="date-sub">${escapeHtml(timePart)}</span>
+            </td>
+            <td class="store-cell">${escapeHtml(c.store)}</td>
+            <td><strong>${escapeHtml(c.product)}</strong></td>
+            <td><span class="badge">${escapeHtml(c.claimType)}</span></td>
+          </tr>
+        `;
+      }).join('');
     }
 
     async function saveSettings() {
