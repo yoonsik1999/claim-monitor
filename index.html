@@ -57,7 +57,7 @@
 
     .container { max-width: 960px; margin: 20px auto; padding: 0 16px; }
 
-    /* 경보 배너 */
+    /* 경보 배너 및 드롭다운 */
     .alert-banner {
       display: none;
       background: var(--alert-bg);
@@ -72,10 +72,64 @@
       color: var(--alert-text);
       font-weight: 700;
       font-size: 0.95rem;
-      margin-bottom: 6px;
+      margin-bottom: 8px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .alert-hint {
+      font-size: 0.76rem;
+      font-weight: 500;
+      color: #991B1B;
     }
     .alert-list { list-style: none; font-size: 0.9rem; color: #7F1D1D; }
-    .alert-list li { margin-top: 4px; }
+    .alert-item-wrap { margin-top: 6px; }
+    .alert-item-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 9px 12px;
+      background: rgba(255, 255, 255, 0.75);
+      border: 1px solid #F3C6C6;
+      border-radius: 6px;
+      cursor: pointer;
+      user-select: none;
+      transition: background 0.15s ease;
+    }
+    .alert-item-header:hover { background: #FFFFFF; }
+    .alert-arrow {
+      font-size: 0.8rem;
+      color: var(--alert-text);
+      transition: transform 0.2s ease;
+      margin-left: 8px;
+    }
+    .alert-item-header.open .alert-arrow {
+      transform: rotate(180deg);
+    }
+
+    /* 드롭다운 발생 이력 패널 */
+    .alert-dropdown {
+      display: none;
+      background: #FFFFFF;
+      border: 1px solid #F3C6C6;
+      border-top: none;
+      border-radius: 0 0 6px 6px;
+      padding: 8px 12px;
+      margin-top: -2px;
+    }
+    .alert-dropdown.open { display: block; }
+    .history-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 6px 4px;
+      border-bottom: 1px dashed #EFE5E5;
+      font-size: 0.84rem;
+      color: var(--text-main);
+    }
+    .history-item:last-child { border-bottom: none; }
+    .history-store { font-weight: 600; color: var(--coffee-dark); }
+    .history-date { font-size: 0.78rem; color: var(--text-sub); }
 
     /* 요약 카드 */
     .summary-grid {
@@ -90,9 +144,22 @@
       border-radius: 10px;
       padding: 16px;
     }
+    .card.clickable {
+      cursor: pointer;
+      transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    }
+    .card.clickable:hover {
+      border-color: var(--alert-border);
+      box-shadow: 0 2px 8px rgba(183, 28, 28, 0.08);
+    }
     .stat-label { font-size: 0.8rem; color: var(--text-sub); margin-bottom: 4px; }
     .stat-value { font-size: 1.5rem; font-weight: 700; color: var(--coffee-dark); }
     .stat-value.danger { color: var(--alert-text); }
+    .stat-sub-hint {
+      font-size: 0.74rem;
+      color: var(--alert-text);
+      margin-top: 2px;
+    }
 
     /* 설정 및 액션 바 */
     .controls-bar {
@@ -174,17 +241,6 @@
     }
     .empty-msg { text-align: center; padding: 32px; color: var(--text-sub); }
 
-    @media (max-width: 600px) {
-      .summary-grid { grid-template-columns: 1fr; }
-      .controls-bar { flex-direction: column; align-items: stretch; }
-    }
- /* ▼ 기존 index.html에 이미 들어있는 마지막 부분 */
-    @media (max-width: 600px) {
-      .summary-grid { grid-template-columns: 1fr; }
-      .controls-bar { flex-direction: column; align-items: stretch; }
-    }
-
-    /* ▼▼▼ 바로 여기에 새 코드를 붙여넣으세요! ▼▼▼ */
     /* 수신일시 2줄 레이아웃 및 매장명 여백 확보 */
     .date-cell {
       white-space: nowrap;
@@ -206,10 +262,11 @@
       min-width: 110px;
       word-break: keep-all;
     }
-    /* ▲▲▲ 여기까지 붙여넣기 ▲▲▲ */
 
-  </style>   <!-- ◀ 이 줄 바로 위에 넣어야 적용됩니다! -->
-</head>
+    @media (max-width: 600px) {
+      .summary-grid { grid-template-columns: 1fr; }
+      .controls-bar { flex-direction: column; align-items: stretch; }
+    }
   </style>
 </head>
 <body>
@@ -219,9 +276,12 @@
   </header>
 
   <main class="container">
-    <!-- 1. 기준 초과 경보 배너 -->
+    <!-- 1. 기준 초과 경보 배너 (항목 클릭 시 발생이력 드롭다운 표시) -->
     <section id="alertBanner" class="alert-banner">
-      <div class="alert-title" id="alertTitle">기준 건수 초과 경보 발생</div>
+      <div class="alert-title">
+        <span id="alertTitle">🚨 경보 발생</span>
+        <span class="alert-hint">항목을 누르면 발생 이력이 열립니다</span>
+      </div>
       <ul id="alertList" class="alert-list"></ul>
     </section>
 
@@ -231,9 +291,10 @@
         <div class="stat-label">전체 수집 건수</div>
         <div class="stat-value" id="totalCount">-</div>
       </div>
-      <div class="card">
+      <div class="card clickable" id="alertSummaryCard" onclick="handleSummaryCardClick()">
         <div class="stat-label">현재 경보 항목</div>
         <div class="stat-value danger" id="alertCount">-</div>
+        <div class="stat-sub-hint" id="alertCardHint" style="display:none;">눌러서 발생 이력 보기 ▾</div>
       </div>
       <div class="card">
         <div class="stat-label">적용 중인 경보 기준</div>
@@ -284,6 +345,8 @@
 
   <script>
     let allClaims = [];
+    let currentAlerts = [];
+    let currentSettings = { days: 2, threshold: 3 };
 
     async function loadDashboard() {
       const tbody = document.getElementById('tableBody');
@@ -298,32 +361,97 @@
         }
 
         allClaims = json.data || [];
-        const alerts = json.alerts || [];
-        const settings = json.settings || { days: 2, threshold: 3 };
+        currentAlerts = json.alerts || [];
+        currentSettings = json.settings || { days: 2, threshold: 3 };
 
         // 요약 및 설정값 반영
         document.getElementById('totalCount').textContent = allClaims.length + '건';
-        document.getElementById('alertCount').textContent = alerts.length + '건';
-        document.getElementById('currentRule').textContent = `${settings.days}일 내 ${settings.threshold}건`;
-        document.getElementById('inputDays').value = settings.days;
-        document.getElementById('inputThreshold').value = settings.threshold;
+        document.getElementById('alertCount').textContent = currentAlerts.length + '건';
+        document.getElementById('currentRule').textContent = `${currentSettings.days}일 내 ${currentSettings.threshold}건`;
+        document.getElementById('inputDays').value = currentSettings.days;
+        document.getElementById('inputThreshold').value = currentSettings.threshold;
 
-        // 경보 배너 렌더링
-        const banner = document.getElementById('alertBanner');
-        const alertList = document.getElementById('alertList');
-        if (alerts.length > 0) {
-          document.getElementById('alertTitle').textContent = `🚨 경보 발생 (${settings.days}일 내 ${settings.threshold}건 이상)`;
-          alertList.innerHTML = alerts
-            .map(a => `<li>• <strong>${escapeHtml(a.product)}</strong> [${escapeHtml(a.claimType)}] — <strong>${a.count}건</strong></li>`)
-            .join('');
-          banner.classList.add('active');
-        } else {
-          banner.classList.remove('active');
-        }
-
+        // 경보 배너 및 드롭다운 렌더링
+        renderAlerts();
         renderTable();
       } catch (err) {
         tbody.innerHTML = `<tr><td colspan="4" class="empty-msg">오류: ${escapeHtml(err.message)}</td></tr>`;
+      }
+    }
+
+    function renderAlerts() {
+      const banner = document.getElementById('alertBanner');
+      const alertList = document.getElementById('alertList');
+      const cardHint = document.getElementById('alertCardHint');
+
+      if (currentAlerts.length === 0) {
+        banner.classList.remove('active');
+        cardHint.style.display = 'none';
+        return;
+      }
+
+      cardHint.style.display = 'block';
+      document.getElementById('alertTitle').textContent =
+        `🚨 경보 발생 (${currentSettings.days}일 내 ${currentSettings.threshold}건 이상)`;
+
+      const now = Date.now();
+      const windowMs = currentSettings.days * 24 * 60 * 60 * 1000;
+
+      alertList.innerHTML = currentAlerts.map((a, idx) => {
+        // 해당 경보 항목의 발생 이력 필터링 (최신순)
+        const matchingHistory = allClaims.filter(c => {
+          if (c.product !== a.product || c.claimType !== a.claimType) return false;
+          const ts = new Date(String(c.date).replace(' ', 'T') + '+09:00').getTime();
+          return !isNaN(ts) ? (now - ts <= windowMs) : true;
+        }).slice(0, a.count);
+
+        const historyRowsHtml = matchingHistory.length > 0
+          ? matchingHistory.map(h => `
+              <div class="history-item">
+                <span class="history-store">${escapeHtml(h.store)}</span>
+                <span class="history-date">${escapeHtml(String(h.date).slice(0, 16))}</span>
+              </div>
+            `).join('')
+          : '<div class="history-item"><span>상세 이력을 찾을 수 없습니다.</span></div>';
+
+        return `
+          <li class="alert-item-wrap">
+            <div class="alert-item-header" id="alert-header-${idx}" onclick="toggleAlertHistory(${idx})">
+              <span>• <strong>${escapeHtml(a.product)}</strong> [${escapeHtml(a.claimType)}] — <strong>${a.count}건</strong></span>
+              <span class="alert-arrow">▾</span>
+            </div>
+            <div class="alert-dropdown" id="alert-detail-${idx}">
+              ${historyRowsHtml}
+            </div>
+          </li>
+        `;
+      }).join('');
+
+      banner.classList.add('active');
+    }
+
+    // 개별 경보 항목 클릭 시 발생 이력 드롭다운 토글
+    function toggleAlertHistory(index) {
+      const header = document.getElementById(`alert-header-${index}`);
+      const detail = document.getElementById(`alert-detail-${index}`);
+      if (!header || !detail) return;
+
+      header.classList.toggle('open');
+      detail.classList.toggle('open');
+    }
+
+    // '현재 경보 항목' 요약 카드 클릭 시 경보 영역으로 이동 및 첫 번째 드롭다운 열기
+    function handleSummaryCardClick() {
+      if (currentAlerts.length === 0) {
+        alert('현재 기준 건수를 초과한 경보 항목이 없습니다.');
+        return;
+      }
+      const banner = document.getElementById('alertBanner');
+      banner.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+      const firstDetail = document.getElementById('alert-detail-0');
+      if (firstDetail && !firstDetail.classList.contains('open')) {
+        toggleAlertHistory(0);
       }
     }
 
@@ -343,12 +471,10 @@
       }
 
       tbody.innerHTML = filtered.map(c => {
-        // ① 날짜와 시간 쪼개기: '2026-11-23 11:33:53' -> ['2026-11-23', '11:33:53']
         const parts = String(c.date || '').split(' ');
-        const datePart = parts[0] || '';               // 첫 번째 덩어리: '2026-11-23'
-        const timePart = parts[1] ? parts[1].slice(0, 5) : ''; // 두 번째 덩어리 앞 5글자: '11:33'
+        const datePart = parts[0] || '';
+        const timePart = parts[1] ? parts[1].slice(0, 5) : '';
 
-        // ② 윗줄(date-main)과 아랫줄(date-sub)로 나누어 화면에 그리기
         return `
           <tr>
             <td class="date-cell">
@@ -413,7 +539,6 @@
         .replace(/"/g, '&quot;');
     }
 
-    // 페이지 로드 시 자동 조회
     loadDashboard();
   </script>
 </body>
